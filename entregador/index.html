@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Entregador</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h1>Compartilhando localização...</h1>
+  <script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDYVoI4pbD16pBHD9WgMrTCaqv6b3Fx2Kg",
+        authDomain: "apis-b46c2.firebaseapp.com",
+        databaseURL: "https://apis-b46c2-default-rtdb.firebaseio.com",
+        projectId: "apis-b46c2",
+        storageBucket: "apis-b46c2.firebasestorage.app",
+        messagingSenderId: "901137461949",
+        appId: "1:901137461949:web:46ecf7cb34495dd852bdd4",
+        measurementId: "G-NRDD6H2BQD"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function atualizarLocalizacao(pos) {
+      const latitude = pos.coords.latitude;
+      const longitude = pos.coords.longitude;
+      db.ref("entregador").set({ latitude, longitude });
+    }
+
+    function erro(err) {
+      console.error("Erro ao obter localização:", err);
+    }
+
+    navigator.geolocation.watchPosition(atualizarLocalizacao, erro, {
+      enableHighAccuracy: true
+    });
+  </script>
+</body>
+</html>
