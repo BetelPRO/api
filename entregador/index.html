@@ -1,40 +1,100 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Entregador</title>
+  <title>Rota até o Endereço</title>
+  <style>
+    #map { height: 90vh; width: 100%; }
+    #controle {
+      padding: 10px;
+      background: white;
+    }
+  </style>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 </head>
 <body>
-  <a href="cliente.html">mapa cliente</a>
-  <h1>Compartilhando localização...</h1>
+  <div id="controle">
+    <input type="text" id="destino" placeholder="Digite o endereço de destino" style="width: 70%;">
+    <button onclick="tracarRota()">Traçar rota</button>
+  </div>
+  <div id="map"></div>
+
   <script>
     const firebaseConfig = {
-        apiKey: "AIzaSyDYVoI4pbD16pBHD9WgMrTCaqv6b3Fx2Kg",
-        authDomain: "apis-b46c2.firebaseapp.com",
-        databaseURL: "https://apis-b46c2-default-rtdb.firebaseio.com",
-        projectId: "apis-b46c2",
-        storageBucket: "apis-b46c2.firebasestorage.app",
-        messagingSenderId: "901137461949",
-        appId: "1:901137461949:web:46ecf7cb34495dd852bdd4",
-        measurementId: "G-NRDD6H2BQD"
+      apiKey: "AIzaSyDYVoI4pbD16pBHD9WgMrTCaqv6b3Fx2Kg",
+      authDomain: "apis-b46c2.firebaseapp.com",
+      databaseURL: "https://apis-b46c2-default-rtdb.firebaseio.com",
+      projectId: "apis-b46c2",
+      storageBucket: "apis-b46c2.firebasestorage.app",
+      messagingSenderId: "901137461949",
+      appId: "1:901137461949:web:46ecf7cb34495dd852bdd4"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    function atualizarLocalizacao(pos) {
-      const latitude = pos.coords.latitude;
-      const longitude = pos.coords.longitude;
-      db.ref("entregador").set({ latitude, longitude });
+    let map, directionsService, directionsRenderer;
+    let localizacaoAtual = null;
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: -8.05, lng: -34.9 },
+        zoom: 14
+      });
+
+      directionsService = new google.maps.DirectionsService();
+      directionsRenderer = new google.maps.DirectionsRenderer({ map });
+
+      // 🛰️ Localização em tempo real
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          localizacaoAtual = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude
+          };
+
+          // Atualiza no Firebase
+          db.ref("entregador").set({
+            latitude: localizacaoAtual.lat,
+            longitude: localizacaoAtual.lng
+          });
+        },
+        (erro) => {
+          console.error("Erro ao obter localização:", erro);
+        },
+        { enableHighAccuracy: true }
+      );
     }
 
-    function erro(err) {
-      console.error("Erro ao obter localização:", err);
+    function tracarRota() {
+      const destino = document.getElementById("destino").value;
+      if (!destino) {
+        alert("Digite um endereço de destino.");
+        return;
+      }
+      if (!localizacaoAtual) {
+        alert("Aguardando localização atual...");
+        return;
+      }
+
+      directionsService.route({
+        origin: localizacaoAtual,
+        destination: destino,
+        travelMode: google.maps.TravelMode.DRIVING
+      }, (resposta, status) => {
+        if (status === "OK") {
+          directionsRenderer.setDirections(resposta);
+        } else {
+          alert("Erro ao calcular rota: " + status);
+        }
+      });
     }
 
-    navigator.geolocation.watchPosition(atualizarLocalizacao, erro, {
-      enableHighAccuracy: true
-    });
+    // Disponibiliza globalmente
+    window.initMap = initMap;
+  </script>
+
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDHhBAw0YDhl7-af8z1iXOdvIl2unPfgig&callback=initMap">
   </script>
 </body>
 </html>
