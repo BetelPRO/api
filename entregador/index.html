@@ -37,6 +37,24 @@
     let localizacaoAtual = null;
 
     function initMap() {
+      if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const pos = {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                };
+                map.setCenter(pos);
+              },
+              () => {
+                handleLocationError(true, infoWindow, map.getCenter());
+              },
+            );
+        } else {
+          // Browser doesn't support Geolocation
+          handleLocationError(false, infoWindow, map.getCenter());
+        }
+
       map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: -8.05, lng: -34.9 },
         zoom: 14
@@ -67,8 +85,8 @@
     }
 
     function tracarRota() {
-      const destino = document.getElementById("destino").value;
-      if (!destino) {
+      const destinoTexto = document.getElementById("destino").value;
+      if (!destinoTexto) {
         alert("Digite um endereço de destino.");
         return;
       }
@@ -77,13 +95,35 @@
         return;
       }
 
+      const origem = localizacaoAtual;
+
       directionsService.route({
-        origin: localizacaoAtual,
-        destination: destino,
+        origin: origem,
+        destination: destinoTexto,
         travelMode: google.maps.TravelMode.DRIVING
       }, (resposta, status) => {
         if (status === "OK") {
           directionsRenderer.setDirections(resposta);
+
+          // Remove marcadores anteriores se quiser
+
+          // 🔵 Marcador personalizado de origem (entregador)
+          new google.maps.Marker({
+            position: origem,
+            map: map,
+            title: "Entregador",
+            icon: "Glup.png"
+          });
+
+          // 🟢 Marcador personalizado de destino
+          const destinoLatLng = resposta.routes[0].legs[0].end_location;
+          new google.maps.Marker({
+            position: destinoLatLng,
+            map: map,
+            title: "Destino",
+            icon: "https://maps.google.com/mapfiles/kml/shapes/target.png"
+          });
+
         } else {
           alert("Erro ao calcular rota: " + status);
         }
