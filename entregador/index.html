@@ -7,6 +7,12 @@
     #controle {
       padding: 10px;
       background: white;
+      display: flex; /* Para alinhar melhor os elementos de controle */
+      gap: 10px; /* Espaçamento entre os elementos */
+      align-items: center;
+    }
+    #destino {
+        flex-grow: 1; /* Ocupa o espaço disponível */
     }
   </style>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
@@ -15,7 +21,7 @@
 <body>
     <a href="cliente.html">Mapa Cliente</a>
   <div id="controle">
-    <input type="text" id="destino" placeholder="Digite o endereço de destino" style="width: 70%;">
+    <input type="text" id="destino" placeholder="Digite o endereço de destino">
     <button onclick="tracarRota()">Traçar rota</button>
   </div>
   <div id="map"></div>
@@ -33,56 +39,101 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let map, directionsService, directionsRenderer;
+    let map;
+    let directionsService;
+    let directionsRenderer;
     let localizacaoAtual = null;
+    let marcadorOrigem = null; // Declarado aqui para escopo global ou superior
+    let marcadorDestino = null; // Declarado aqui para escopo global ou superior
 
     function initMap() {
-      if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              (position) => {
-                const pos = {
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude,
-                };
-                map.setCenter(pos);
-              },
-              () => {
-                handleLocationError(true, infoWindow, map.getCenter());
-              },
-            );
-        } else {
-          // Browser doesn't support Geolocation
-          handleLocationError(false, infoWindow, map.getCenter());
-        }
-
       map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: -8.05, lng: -34.9 },
+        center: { lat: -8.05, lng: -34.9 }, // Centro inicial padrão
         zoom: 14
       });
 
       directionsService = new google.maps.DirectionsService();
-      directionsRenderer = new google.maps.DirectionsRenderer({ map });
+      directionsRenderer = new google.maps.DirectionsRenderer({
+        map: map,
+        suppressMarkers: true // Impede que a DirectionsRenderer adicione seus próprios marcadores A e B
+      });
 
-      // 🛰️ Localização em tempo real
-      navigator.geolocation.watchPosition(
-        (pos) => {
-          localizacaoAtual = {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-          };
+      // 🛰️ Obter localização inicial uma vez
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const pos = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            map.setCenter(pos); // Centraliza o mapa na localização atual
 
-          // Atualiza no Firebase
-          db.ref("entregador").set({
-            latitude: localizacaoAtual.lat,
-            longitude: localizacaoAtual.lng
-          });
-        },
-        (erro) => {
-          console.error("Erro ao obter localização:", erro);
-        },
-        { enableHighAccuracy: true }
-      );
+            // Opcional: Adicionar um marcador para a posição inicial logo que obtida
+            if (marcadorOrigem) marcadorOrigem.setMap(null); // Limpa o anterior se houver
+            marcadorOrigem = new google.maps.Marker({
+              position: pos,
+              map: map,
+              title: "Minha Posição",
+              icon: {
+                url: "https://raw.githubusercontent.com/BetelPRO/api/ead7ae19c4cdabf5a7f11758f14ecb6b4efc5d1d/entregador/Glu.png",
+                scaledSize: new google.maps.Size(40, 40)
+              }
+            });
+          },
+          (error) => {
+            console.error("Erro ao obter localização inicial:", error);
+            alert("Não foi possível obter sua localização atual. Por favor, permita o acesso à localização.");
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 } // Opções de geolocalização
+        );
+
+        // 🛰️ Localização em tempo real (atualiza o Firebase e o marcador de origem)
+        navigator.geolocation.watchPosition(
+          (pos) => {
+            localizacaoAtual = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude
+            };
+
+            // Atualiza no Firebase
+            db.ref("entregador").set({
+              latitude: localizacaoAtual.lat,
+              longitude: localizacaoAtual.lng
+            });
+
+            // Atualiza a posição do marcador de origem
+            if (marcadorOrigem) {
+              marcadorOrigem.setPosition(localizacaoAtual);
+            } else {
+              // Se o marcador ainda não foi criado (ex: na primeira execução do watchPosition)
+              marcadorOrigem = new google.maps.Marker({
+                position: localizacaoAtual,
+                map: map,
+                title: "Entregador",
+                icon: {
+                  url: "https://raw.githubusercontent.com/BetelPRO/api/ead7ae19c4cdabf5a7f11758f14ecb6b4efc5d1d/entregador/Glu.png",
+                  scaledSize: new google.maps.Size(40, 40)
+                }
+              });
+            }
+
+            // Se uma rota já foi traçada, recalcule para atualizar a origem
+            // Opcional: só recalcular se a mudança for significativa
+            // if (directionsRenderer.getDirections()) {
+            //   tracarRota(); // Recalcula a rota com a nova origem
+            // }
+
+          },
+          (erro) => {
+            console.error("Erro ao obter localização em tempo real:", erro);
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+      } else {
+        alert("Seu navegador não suporta a API de Geolocalização.");
+      }
     }
+
 
     function tracarRota() {
       const destinoTexto = document.getElementById("destino").value;
@@ -105,32 +156,35 @@
         if (status === "OK") {
           directionsRenderer.setDirections(resposta);
 
-          // Remove marcadores anteriores se quiser
+          // 🧹 Remove marcador de destino antigo, se existir
+          if (marcadorDestino) marcadorDestino.setMap(null);
 
-          // 🔵 Marcador personalizado de origem (entregador)
-          new google.maps.Marker({
-            position: origem,
-            map: map,
-            title: "Entregador",
-            icon: "https://raw.githubusercontent.com/BetelPRO/api/ead7ae19c4cdabf5a7f11758f14ecb6b4efc5d1d/entregador/Glu.png"
-          });
-
-          // 🟢 Marcador personalizado de destino
+          // 🟢 Novo marcador de destino
           const destinoLatLng = resposta.routes[0].legs[0].end_location;
-          new google.maps.Marker({
+          marcadorDestino = new google.maps.Marker({
             position: destinoLatLng,
             map: map,
             title: "Destino",
-            icon: "https://maps.google.com/mapfiles/kml/shapes/target.png"
+            // Para usar o marcador padrão do Google Maps (azul)
+            // basta não definir a propriedade 'icon' ou definir como null.
+            // Eu removi o URL incorreto.
+            // icon: {
+            //   url: "https://maps.gstatic.com/mapfiles/ms/icons/green-dot.png", // Exemplo de um ícone de destino verde
+            //   scaledSize: new google.maps.Size(32, 32)
+            // }
           });
 
         } else {
           alert("Erro ao calcular rota: " + status);
+          // Limpa a rota e marcadores se houver erro
+          directionsRenderer.setDirections({ routes: [] }); // Limpa a rota no mapa
+          if (marcadorDestino) marcadorDestino.setMap(null); // Remove o marcador de destino
+          marcadorDestino = null; // Reinicia a variável
         }
       });
     }
 
-    // Disponibiliza globalmente
+    // Disponibiliza globalmente para o callback da API do Google Maps
     window.initMap = initMap;
   </script>
 
