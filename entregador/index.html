@@ -63,6 +63,14 @@
       color: #333;
       border-bottom: 1px solid #ddd;
     }
+    /* Estilos para o botão de tela cheia do Google Maps */
+    .gm-fullscreen-control {
+        /* Define o tamanho do container do botão */
+        width: 100px !important; /* !important para forçar a sobrescrita */
+        height: 70px !important; /* !important para forçar a sobrescrita */
+        border-radius: 8px !important;
+        overflow: hidden; /* Garante que nada transborde */
+    }
 
     /* Media Queries para telas menores (celulares) */
     @media (max-width: 600px) {
@@ -91,8 +99,11 @@
         width: 100%; /* Ocupa a largura total */
         box-sizing: border-box; /* Inclui padding e borda na largura total */
       }
+      .gm-fullscreen-control {
+        width: 100px !important; /* Talvez menor para mobile */
+        height: 70px !important;
+      }
     }
-
   </style>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
@@ -262,7 +273,7 @@
         }
       });
     }
-
+    
     // Disponibiliza globalmente para o callback da API do Google Maps
     window.initMap = initMap;
   </script>
